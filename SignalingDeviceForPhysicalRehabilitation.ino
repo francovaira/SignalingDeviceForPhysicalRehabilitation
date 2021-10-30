@@ -24,12 +24,12 @@
 
 #define DISTANCE_TIME_ACTION  0 // cuanto tiempo debe estar "cerca" para que sea detectado como true
 
-#define DELAY_TIME_BETWEEN_MOVES 500 // tiempo en segundos*100 entre movimientos
+#define DELAY_TIME_BETWEEN_MOVES 350 // tiempo en segundos*100 entre movimientos
 
-#define LOWER_LIMIT_POTE  50  // in [cm] distancias que ajusta el pote
-#define UPPER_LIMIT_POTE  230 // in [cm]
+#define LOWER_LIMIT_POTE  130  // in [cm] distancias que ajusta el pote
+#define UPPER_LIMIT_POTE  350 // in [cm]
 
-#define SENSOR_MAX_DISTANCE 300
+#define SENSOR_MAX_DISTANCE 360
 
 #define SERVO_A_INIT_POS  0 // in degrees -- unilateral
 #define SERVO_A_MIN_POS   0
@@ -84,7 +84,10 @@ void setup()
 
 void loop()
 {
-  handle_battery_level();
+  if(state != ST_APAGADO)
+  {
+    handle_battery_level();    
+  }
   
   // main state machine
   switch(state)
