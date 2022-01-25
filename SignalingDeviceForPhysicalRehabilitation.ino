@@ -18,11 +18,8 @@
 #define LOW_BATTERY_LIMIT 11.0
 
 #define PEDAL_TIME_ON_OFF 80 // tiempo que debe presionarse el pedal para encender
-#define PEDAL_TIME_OK     15 // tiempo que debe presionarse el pedal para confirmar
 
 #define DISTANCE_TIME_ACTION  0 // cuanto tiempo debe estar "cerca" para que sea detectado como true
-
-#define DELAY_TIME_BETWEEN_MOVES 350 // tiempo en segundos*100 entre movimientos
 
 #define LOWER_LIMIT_POTE  130  // in [cm] distancias que ajusta el pote
 #define UPPER_LIMIT_POTE  350 // in [cm]
@@ -39,6 +36,9 @@
 #define SERVO_B_MAX_POS   180
 #define SERVO_B_TIME_UP   75 // tiempo que permanece arriba
 
+#define DELAY_TIME_BETWEEN_MOVES 350 // tiempo en segundos*100 entre movimientos
+#define DELAY_WAIT_BIDIR_SERVO  175 // time to wait for direction change on bidirectional servo
+
 #define ST_APAGADO    0
 #define ST_READY      1
 #define ST_WORKING    2
@@ -51,7 +51,7 @@ uint8_t state=ST_APAGADO;
 uint8_t substate=0;
 
 uint16_t pedal_time_count=0;
-uint16_t i=0;
+uint16_t led_on_intensity=0;
 
 uint16_t delay_time_between_moves=0;
 
@@ -122,12 +122,12 @@ void loop()
     {
       if(!substate)
       {
-        analogWrite(LED_WHITE, i++);
-        if(i>=255)
+        analogWrite(LED_WHITE, led_on_intensity++);
+        if(led_on_intensity>=255)
         {
           Serial.println("encendido");
           analogWrite(LED_WHITE, 0);
-          i=0;
+          led_on_intensity=0;
           
           pedal_time_count=0;
           distance_selected=LOWER_LIMIT_POTE;
@@ -158,7 +158,7 @@ void loop()
     {
       if(!substate)
       {
-        i=0;
+        led_on_intensity=0;
         pedal_time_count=0;
         distance_time_count=0;
 
@@ -225,6 +225,12 @@ void loop()
               }
               servo_B_time_up_count = SERVO_B_TIME_UP;
               servo_B.write(servo_B_current_pos);
+
+              // lifts arm once direction selected with bidirectional servo
+              delay(DELAY_WAIT_BIDIR_SERVO);
+              servo_A_current_pos = SERVO_A_MAX_POS;
+              servo_A_time_up_count = SERVO_A_TIME_UP;
+              servo_A.write(servo_A_current_pos);
             }
             
             analogWrite(LED_WHITE, 255);
@@ -255,6 +261,9 @@ void loop()
           if(!servo_B_time_up_count)
           {
             // return to stand-by position
+            servo_A_current_pos = SERVO_A_INIT_POS;
+            servo_A.write(servo_A_current_pos);           
+            delay(DELAY_WAIT_BIDIR_SERVO);
             servo_B_current_pos = SERVO_B_INIT_POS;
             servo_B.write(servo_B_current_pos);
             delay_time_between_moves = DELAY_TIME_BETWEEN_MOVES;
