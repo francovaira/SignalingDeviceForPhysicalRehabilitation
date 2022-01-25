@@ -20,8 +20,6 @@
 #define PEDAL_TIME_ON_OFF 80 // tiempo que debe presionarse el pedal para encender
 #define PEDAL_TIME_OK     15 // tiempo que debe presionarse el pedal para confirmar
 
-#define LED_TIME_TOGGLE   7 // tiempo de parpadeo led blanco cuando setea distancia
-
 #define DISTANCE_TIME_ACTION  0 // cuanto tiempo debe estar "cerca" para que sea detectado como true
 
 #define DELAY_TIME_BETWEEN_MOVES 350 // tiempo en segundos*100 entre movimientos
@@ -31,16 +29,14 @@
 
 #define SENSOR_MAX_DISTANCE 360
 
-#define SERVO_A_INIT_POS  0 // in degrees -- unilateral
+#define SERVO_A_INIT_POS  0 // in degrees -- UNILATERAL
 #define SERVO_A_MIN_POS   0
 #define SERVO_A_MAX_POS   90
-#define SERVO_A_INCREMENT 2
 #define SERVO_A_TIME_UP   75 // tiempo que permanece arriba
 
-#define SERVO_B_INIT_POS  90 // in degrees -- bilateral
+#define SERVO_B_INIT_POS  90 // in degrees -- BILATERAL
 #define SERVO_B_MIN_POS   0
 #define SERVO_B_MAX_POS   180
-#define SERVO_B_INCREMENT 2
 #define SERVO_B_TIME_UP   75 // tiempo que permanece arriba
 
 #define ST_APAGADO    0
@@ -56,15 +52,11 @@ uint8_t substate=0;
 
 uint16_t pedal_time_count=0;
 uint16_t i=0;
-uint16_t led_time_count=0;
-uint8_t led_toggle_byte=0;
 
 uint16_t delay_time_between_moves=0;
 
-uint8_t servo_A_move_count=0;
 uint8_t servo_A_current_pos=0;
 uint16_t servo_A_time_up_count=0;
-uint8_t servo_B_move_count=0;
 uint8_t servo_B_current_pos=0;
 uint16_t servo_B_time_up_count=0;
 
@@ -100,10 +92,7 @@ void loop()
         
         analogWrite(LED_WHITE, 0);
         analogWrite(LED_RED, 0);
-        
-        // set servos to start position
-        //servo_A.write(SERVO_A_INIT_POS);
-        //servo_B.write(SERVO_B_INIT_POS);
+
         servo_A.detach();
         servo_B.detach();
         pedal_time_count=0;
@@ -140,8 +129,6 @@ void loop()
           analogWrite(LED_WHITE, 0);
           i=0;
           
-          led_time_count=0;
-          led_toggle_byte=0;
           pedal_time_count=0;
           distance_selected=LOWER_LIMIT_POTE;
 
@@ -155,6 +142,7 @@ void loop()
           while(se_pulso_pedal()) {};
           substate++;
 
+          // jumps to working state just after setting servos
           state = ST_WORKING;
           substate = 0;
           break;
@@ -164,57 +152,6 @@ void loop()
           break;  
         }
       }
-
-      // distance handling
-      distance_sense = get_distancia();
-      distance_set = map(analogRead(POTE), 0, 1023, LOWER_LIMIT_POTE, UPPER_LIMIT_POTE);
-
-      // start blinking white to notify distance set
-      if(distance_sense <= distance_set)
-      {
-        led_time_count++;
-        if(led_time_count >= LED_TIME_TOGGLE)
-        {
-          led_time_count=0;
-          led_toggle_byte = ~led_toggle_byte;
-          analogWrite(LED_WHITE, led_toggle_byte);
-        }
-      }
-      else
-      {
-        led_time_count=0;
-        analogWrite(LED_WHITE, 255);  
-      }
-
-      // check if has to shut down
-      if(se_pulso_pedal())
-      {
-        pedal_time_count++;
-
-        if(pedal_time_count >= PEDAL_TIME_ON_OFF)
-        {
-          analogWrite(LED_RED, 255);
-          pedal_time_count=0;
-          substate=0;
-          state = ST_APAGADO;
-          while(se_pulso_pedal());   
-        }
-      }
-      else
-      {
-        // check if distance has been selected
-        if(pedal_time_count >= PEDAL_TIME_OK)
-        {
-          Serial.println("working...");
-          distance_selected = distance_set;
-          state = ST_WORKING;
-          i=0;
-          substate=0;  
-        }
-        pedal_time_count=0;
-      }
-
-      break;
     }
 
     case ST_WORKING:
@@ -224,12 +161,6 @@ void loop()
         i=0;
         pedal_time_count=0;
         distance_time_count=0;
-        servo_A_move_count=0;
-        servo_B_move_count=0;
-        servo_A_current_pos = SERVO_A_INIT_POS;
-        servo_B_current_pos = SERVO_B_INIT_POS;
-        servo_A.write(servo_A_current_pos);
-        servo_B.write(servo_B_current_pos);
 
         randomSeed(analogRead(RAND_PIN_SEED));
         while(se_pulso_pedal()){};
@@ -247,40 +178,44 @@ void loop()
           pedal_time_count=0;
           substate=0;
           state = ST_APAGADO;
-          while(se_pulso_pedal());   
+          while(se_pulso_pedal()) {};   
         }
+      }
+      else
+      {
+        pedal_time_count = 0;
       }
 
       if(delay_time_between_moves)
       {
         delay_time_between_moves--;
-        break;
+        break; // avoids the execution of code below
       }
 
+      // if servos have returned to stand-by position
       if(!servo_A_time_up_count && !servo_B_time_up_count)
       {
         // distance adjust handling
         distance_selected = map(analogRead(POTE), 0, 1023, LOWER_LIMIT_POTE, UPPER_LIMIT_POTE);
         distance_sense = get_distancia();
-        
-        if(distance_sense <= distance_selected) // debe mover uno de los servos
+
+        // person detection - is it closer than threshold?
+        if(distance_sense <= distance_selected)
         {
+          // detection delay
           distance_time_count++;
-  
           if(distance_time_count >= DISTANCE_TIME_ACTION)
           {
-            // aca deberia seleccionar uno de dos
-            randomSeed(analogRead(RAND_PIN_SEED));
-            if(random()%2==0)
+            // selects a servo by parity of a random number
+            if(random()%2==0) // SERVO A (unilateral)
             {
               servo_A_current_pos = SERVO_A_MAX_POS;
               servo_A_time_up_count = SERVO_A_TIME_UP;
               servo_A.write(servo_A_current_pos);
             }
-            else
+            else // SERVO B (bilateral)
             {
-              randomSeed(analogRead(RAND_PIN_SEED));
-              if(random()%2==0) // esta logica es asi porque el servo gira hacia ambas direcciones 
+              if(random()%2==0) // selects direction of bidirectional servo 
               {
                 servo_B_current_pos = SERVO_B_MAX_POS; 
               }
@@ -291,7 +226,9 @@ void loop()
               servo_B_time_up_count = SERVO_B_TIME_UP;
               servo_B.write(servo_B_current_pos);
             }
+            
             analogWrite(LED_WHITE, 255);
+            distance_time_count = 0;
           }
         }
       }
@@ -304,11 +241,11 @@ void loop()
           servo_A_time_up_count--;
           if(!servo_A_time_up_count)
           {
-            servo_A_move_count = SERVO_A_INIT_POS;
+            // return to stand-by position
             servo_A_current_pos = SERVO_A_INIT_POS;
             servo_A.write(servo_A_current_pos);
             delay_time_between_moves = DELAY_TIME_BETWEEN_MOVES;
-            analogWrite(LED_WHITE, 0);
+            analogWrite(LED_WHITE, 0);  
           }
         }
 
@@ -317,7 +254,7 @@ void loop()
           servo_B_time_up_count--;
           if(!servo_B_time_up_count)
           {
-            servo_B_move_count = SERVO_B_INIT_POS;
+            // return to stand-by position
             servo_B_current_pos = SERVO_B_INIT_POS;
             servo_B.write(servo_B_current_pos);
             delay_time_between_moves = DELAY_TIME_BETWEEN_MOVES;
