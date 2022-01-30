@@ -37,7 +37,7 @@
 #define SERVO_B_TIME_UP   75 // tiempo que permanece arriba
 
 #define DELAY_TIME_BETWEEN_MOVES 350 // tiempo en segundos*100 entre movimientos
-#define DELAY_WAIT_BIDIR_SERVO  175 // time to wait for direction change on bidirectional servo
+#define DELAY_WAIT_BIDIR_SERVO  350 // time to wait for direction change on bidirectional servo
 
 #define ST_APAGADO    0
 #define ST_READY      1
@@ -209,6 +209,7 @@ void loop()
             // selects a servo by parity of a random number
             if(random()%2==0) // SERVO A (unilateral)
             {
+              analogWrite(LED_WHITE, 255);
               servo_A_current_pos = SERVO_A_MAX_POS;
               servo_A_time_up_count = SERVO_A_TIME_UP;
               servo_A.write(servo_A_current_pos);
@@ -228,12 +229,13 @@ void loop()
 
               // lifts arm once direction selected with bidirectional servo
               delay(DELAY_WAIT_BIDIR_SERVO);
+              analogWrite(LED_WHITE, 255);
               servo_A_current_pos = SERVO_A_MAX_POS;
               servo_A_time_up_count = SERVO_A_TIME_UP;
               servo_A.write(servo_A_current_pos);
             }
             
-            analogWrite(LED_WHITE, 255);
+            //analogWrite(LED_WHITE, 255);
             distance_time_count = 0;
           }
         }
@@ -262,12 +264,12 @@ void loop()
           {
             // return to stand-by position
             servo_A_current_pos = SERVO_A_INIT_POS;
-            servo_A.write(servo_A_current_pos);           
+            servo_A.write(servo_A_current_pos);
+            analogWrite(LED_WHITE, 0);
             delay(DELAY_WAIT_BIDIR_SERVO);
             servo_B_current_pos = SERVO_B_INIT_POS;
             servo_B.write(servo_B_current_pos);
             delay_time_between_moves = DELAY_TIME_BETWEEN_MOVES;
-            analogWrite(LED_WHITE, 0);
           }
         }
       }
@@ -336,7 +338,7 @@ void handle_battery_level()
     batt_voltage = (analogRead(BAT_LEVEL) * (23.0/1024.0))*0.3 + batt_voltage*0.7;
   }
 
-  if(count++>200)
+  if(count++>2000)
   {
     //Serial.print("BAT:");
     //Serial.println(batt_voltage);
